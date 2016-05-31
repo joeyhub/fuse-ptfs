@@ -1,4 +1,4 @@
-AC_PREREQ(2.69)
+AC_PREREQ(2.63)
 AC_INIT(fuse-ptfs, 1.0, https://github.com/joeyhub/fuse-ptfs)
 AM_INIT_AUTOMAKE(fuse-ptfs, 1.0)
 AC_CONFIG_SRCDIR([src/fuse_ptfs.c])

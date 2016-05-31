@@ -85,6 +85,7 @@ int fuse_ptfs_filesys_getattr(const char* apPath, struct stat* apStat)
         return -ENOENT;
 
     // Note: I am unsure if fuse applies permissions with this or how to tie it into flags if need be.
+    // Note: This does not consider the permissions of the underlying file.
     apStat->st_mode = S_IFREG | 0600;
     apStat->st_nlink = 1;
     apStat->st_size = tpPartition->mLength;
