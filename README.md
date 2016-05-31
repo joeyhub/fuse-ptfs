@@ -21,7 +21,7 @@ Usage
 
 To use the program simply run it as so:
 
-fuse-ptfs <block device or file> <mount point>
+    fuse-ptfs [block device or file] [mount point]
 
 This program does not support changes to the partition table while mounted and has not been tested for concurrency.
 
@@ -82,7 +82,9 @@ Priorities:
 
 1. Stability.
 2. Build, Testing and Packaging.
-3. Optimisation/Portability.
+3. Optimisation and Portability.
+
+Suggestions:
 
 * The system does not use autoconf/automake or any similar system.
 * Dependencies including versions are not fully listed.
