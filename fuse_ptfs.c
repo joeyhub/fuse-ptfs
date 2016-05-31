@@ -137,11 +137,7 @@ int main(int argc, char* argv[])
     printf("device file: %s\n", tpDeviceFileName);
     printf("mount directory: %s\n", tpMountDir);
 
-    int tError = FUSEPTFS_ERROR_OK;
-    int tDeviceError = FUSEPTFS_DEVICE_ERROR_OK;
-    int tFuseError = FUSEPTFS_FILESYS_ERROR_OK;
-
-    tDeviceError = fuse_ptfs_device_init(&gFusePTFSDevice, tpDeviceFileName, tpMountDir);
+    int tDeviceError = fuse_ptfs_device_init(&gFusePTFSDevice, tpDeviceFileName, tpMountDir);
 
     if(FUSEPTFS_DEVICE_ERROR_OK != tDeviceError)
     {
@@ -163,21 +159,15 @@ int main(int argc, char* argv[])
     LOG_MSG("calling fuse_main()");
     printf("mounting ...\n");
 
-    tFuseError = fuse_main(tArgC, tArgV, &gFusePTFSOperations, &gFusePTFSDevice);
-    tDeviceError = fuse_ptfs_device_free(&gFusePTFSDevice);
+    int tFuseError = fuse_main(tArgC, tArgV, &gFusePTFSOperations, &gFusePTFSDevice);
 
-    if(FUSEPTFS_DEVICE_ERROR_OK != tError)
-    {
-        LOG_MSG("failed to free file data.\n");
+    if(FUSEPTFS_FILESYS_ERROR_OK != tFuseError)
         return FUSEPTFS_ERROR_FAIL;
-    }
 
+    fuse_ptfs_device_free(&gFusePTFSDevice);
 #ifdef _DEBUG
     fuse_ptfs_log_free();
 #endif
 
-    if(tDeviceError || tFuseError)
-        tError = FUSEPTFS_ERROR_FAIL;
-
-    return tError;
+    return FUSEPTFS_ERROR_OK;
 }

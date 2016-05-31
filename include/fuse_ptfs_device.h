@@ -44,7 +44,7 @@ typedef struct FusePTFSDevice {
 } FusePTFSDevice_t;
 
 int fuse_ptfs_device_init(FusePTFSDevice_t* apFusePTFSDevice, const char* apFileName, const char* apMountDir);
-int fuse_ptfs_device_free(FusePTFSDevice_t* apFusePTFSDevice);
+void fuse_ptfs_device_free(FusePTFSDevice_t* apFusePTFSDevice);
 FusePTFSPartition_t* fuse_ptfs_device_find_partition(const char* apPath, FusePTFSDevice_t* apDevice);
 
 #endif

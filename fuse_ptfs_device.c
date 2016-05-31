@@ -121,10 +121,10 @@ int fuse_ptfs_device_init(FusePTFSDevice_t* apFusePTFSDevice, const char* apFile
     return FUSEPTFS_DEVICE_ERROR_OK;
 }
 
-int fuse_ptfs_device_free(FusePTFSDevice_t* apFusePTFSDevice)
+void fuse_ptfs_device_free(FusePTFSDevice_t* apFusePTFSDevice)
 {
     if(NULL == apFusePTFSDevice)
-        return FUSEPTFS_DEVICE_ERROR_FAIL;
+        return;
 
     if(NULL != apFusePTFSDevice->mpFile)
     {
@@ -134,8 +134,6 @@ int fuse_ptfs_device_free(FusePTFSDevice_t* apFusePTFSDevice)
 
     free(apFusePTFSDevice->mpPartitions);
     apFusePTFSDevice->mpPartitions = NULL;
-
-    return FUSEPTFS_DEVICE_ERROR_OK;
 }
 
 FusePTFSPartition_t* fuse_ptfs_device_find_partition(const char* apPath, FusePTFSDevice_t* apDevice)
