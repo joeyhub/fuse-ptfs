@@ -86,7 +86,7 @@ Priorities:
 
 Suggestions:
 
-* The system does not use autoconf/automake or any similar system.
+* Review on autoconf/automake.
 * Dependencies including versions are not fully listed.
 * Packaging for debian/centos or other major distributions included.
 * Concurrency safety has not been examined for any scenarios.
