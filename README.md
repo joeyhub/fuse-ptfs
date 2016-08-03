@@ -1,7 +1,7 @@
 Warning
 =======
 
-This is an early release, use at your own risk. Software hase no warranty.
+This is an early release, use at your own risk. Software has no warranty.
 
 It is very likely to be unstable in certain situations especially where concurrency is needed.
 
