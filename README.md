@@ -3,9 +3,9 @@ Warning
 
 This is an early release, use at your own risk. Software has no warranty.
 
-It is very likely to be unstable in certain situations especially where concurrency is needed.
+It is not well tested especially for concurrent or heavy usage. However it has been successfully used for building images without error.
 
-It is recommended to only use it on a testing basis unless you know what you are doing and can test for consistency after making file operations.
+It is recommended to only use it on a testing basis unless you know what you are doing and can test for consistency after file operations.
 
 Introduction
 ============
