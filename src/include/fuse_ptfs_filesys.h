@@ -21,25 +21,53 @@
 #ifndef _FUSE_PTFS_FILESYS_H_
 #   define _FUSE_PTFS_FILESYS_H_
 
+
+#ifndef FUSE_USE_VERSION
+#   define FUSE_USE_VERSION 39
+#endif
 #   include <fuse.h>
 #   include <stdio.h>
 #   include <string.h>
 #   include <errno.h>
 #   include <fcntl.h>
 
-#   define FUSEPTFS_FILESYS_ERROR_OK   0
-#   define FUSEPTFS_FILESYS_ERROR_FAIL 1
+enum{
+    FUSEPTFS_FILESYS_ERROR_OK = 0,
+    FUSEPTFS_FILESYS_ERROR_FAIL = 1
+};
 
-void* fuse_ptfs_filesys_init(struct fuse_conn_info* conn);
+void* fuse_ptfs_filesys_init(struct fuse_conn_info* conn
+#if FUSE_MAJOR_VERSION >= 3
+    , struct fuse_config *
+#endif
+);
+
 #   ifdef _DEBUG
 void fuse_ptfs_filesys_destroy(void *userdata);
 #   endif
-int fuse_ptfs_filesys_getattr(const char*, struct stat*);
-int fuse_ptfs_filesys_readdir(const char*, void*, fuse_fill_dir_t, off_t, struct fuse_file_info*);
+
+int fuse_ptfs_filesys_getattr(const char*, struct stat*
+#if FUSE_MAJOR_VERSION >= 3
+    , struct fuse_file_info *
+#endif
+);
+
+int fuse_ptfs_filesys_readdir(const char*, void*, fuse_fill_dir_t, off_t, struct fuse_file_info*
+#if FUSE_MAJOR_VERSION >= 3
+    , enum fuse_readdir_flags
+#endif
+);
+
 int fuse_ptfs_filesys_open(const char*, struct fuse_file_info*);
 int fuse_ptfs_filesys_read(const char*, char*, size_t, off_t, struct fuse_file_info*);
 int fuse_ptfs_filesys_write(const char*, const char*, size_t, off_t, struct fuse_file_info*);
-int fuse_ptfs_filesys_truncate(const char*, off_t);
+
+int fuse_ptfs_filesys_truncate(const char*, off_t
+#if FUSE_MAJOR_VERSION >= 3
+    , struct fuse_file_info *
+#endif
+);
+
 int fuse_ptfs_filesys_flush(const char*, struct fuse_file_info*);
 
 #endif
