@@ -30,7 +30,7 @@
 
 #include <parted/parted.h>
 #ifndef FUSE_USE_VERSION
-#   define FUSE_USE_VERSION 26
+#   define FUSE_USE_VERSION 39
 #endif
 #include <fuse.h>
 
@@ -38,8 +38,10 @@
 #include "fuse_ptfs_filesys.h"
 #include "fuse_ptfs_log.h"
 
-#define FUSEPTFS_ERROR_OK   0
-#define FUSEPTFS_ERROR_FAIL 1
+enum{
+    FUSEPTFS_ERROR_OK = 0,
+    FUSEPTFS_ERROR_FAIL = 1
+};
 
 FusePTFSDevice_t gFusePTFSDevice;
 char gDeviceFileName[PATH_MAX];
@@ -62,8 +64,7 @@ struct fuse_operations gFusePTFSOperations = {
 
 void print_usage(void)
 {
-    const char* tpUsage = "Usage: fuse_ptfs device dir";
-    printf(tpUsage);
+    printf("Usage: fuse_ptfs device dir");
 }
 
 int main(int argc, char* argv[])

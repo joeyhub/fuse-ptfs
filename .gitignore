@@ -1,0 +1,16 @@
+/build
+/aclocal.m4
+/compile
+/configure
+/depcomp
+/missing
+/install-sh
+Makefile.in
+Makefile
+.deps
+/autom4te.cache
+/config.log
+/config.status
+/src/config.h
+/CMakeLists.txt.user
+*.o

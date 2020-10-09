@@ -1,0 +1,97 @@
+cmake_minimum_required(VERSION 3.5.1)
+project("fuse-ptfs")
+
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_SOURCE_DIR}/cmake")
+include(CheckSymbolExists)
+include(FindPkgConfig)
+include(GNUInstallDirs)
+include(Hardening)
+include(VersionFromGit)
+getVersionFromGit("PTFS" "0.1")
+
+if(${CMAKE_VERSION} VERSION_GREATER "3.12") 
+	set(CMAKE_CXX_STANDARD 20)
+else()
+	if(${CMAKE_VERSION} VERSION_GREATER "3.8") 
+		set(CMAKE_CXX_STANDARD 17)
+	else()
+		set(CMAKE_CXX_STANDARD 14)
+	endif()
+endif()
+
+set(CMAKE_C_STANDARD 11)
+
+find_package(PkgConfig)
+
+macro(findFuse desiredVersion)
+	if(${desiredVersion} GREATER_EQUAL 3)
+		set(libName "fuse${desiredVersion}")
+	else()
+		set(libName "fuse")
+	endif()
+	message(STATUS "Searching for FUSE ${desiredVersion} (${libName}) ...")
+	pkg_check_modules(FUSE "${libName}")
+	if(FUSE_FOUND)
+		message(STATUS "Found FUSE 3. Libs: ${FUSE_LINK_LIBRARIES} . Includes: ${FUSE_INCLUDE_DIRS} . Flags: ${FUSE_CFLAGS_OTHER}")
+	else()
+		message(ERROR "Haven't found FUSE 3")
+	endif()
+endmacro()
+
+pkg_check_modules(LIBPARTED REQUIRED "libparted")
+
+
+if(NOT DEFINED FUSE_LINK_LIBRARIES OR NOT DEFINED FUSE_INCLUDE_DIRS)
+	if(NOT DEFINED FUSE_DESIRED_VERSION)
+		findFuse(3)
+		if(NOT FUSE_FOUND)
+			findFuse(2)
+			if(NOT FUSE_FOUND)
+				message(FATAL_ERROR "Haven't found any modern FUSE")
+			endif()
+		endif()
+	else()
+		findFuse("${FUSE_DESIRED_VERSION}")
+	endif()
+endif()
+
+check_symbol_exists(itoa "stdlib.h" HAVE_ITOA)
+check_symbol_exists(atoi "stdlib.h" HAVE_ATOI)
+
+set(sourcesDir "${CMAKE_SOURCE_DIR}/src")
+set(includeDir "${sourcesDir}/include")
+
+configure_file("${sourcesDir}/config.h.in" "${sourcesDir}/config.h")
+file(GLOB SRCFILES "${sourcesDir}/*.c")
+
+add_executable(fuse-ptfs "${SRCFILES}")
+target_include_directories(fuse-ptfs PRIVATE "${includeDir}" "${FUSE_INCLUDE_DIRS}" "${LIBPARTED_INCLUDE_DIRS}")
+target_link_libraries(fuse-ptfs PRIVATE "${FUSE_LINK_LIBRARIES}" "${LIBPARTED_LIBRARIES}")
+target_compile_definitions(fuse-ptfs PRIVATE "${FUSE_CFLAGS_OTHER}" "${LIBPARTED_CFLAGS_OTHER}" "-DHAVE_CONFIG_H")
+
+harden(fuse-ptfs)
+
+install(TARGETS fuse-ptfs RUNTIME)
+
+set(CPACK_PACKAGE_CHECKSUM "SHA512")
+set(CPACK_GENERATOR "DEB")
+set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
+set(CPACK_PACKAGE_VENDOR "Joey Barlett")
+set(CPACK_PACKAGE_CONTACT "https://github.com/joeyhub/ptfs")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/joeyhub/ptfs")
+
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_RPM_PACKAGE_AUTOREQ ON)
+
+set(CPACK_DEBIAN_PACKAGE_NAME "fuse-ptfs")
+set(CPACK_PACKAGE_VERSION_MAJOR "${PTFS_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR "${PTFS_VERSION_MINOR}")
+set(CPACK_PACKAGE_VERSION_PATCH "${PTFS_VERSION_PATCH}")
+set(CPACK_PACKAGE_VERSION_TWEAK "${PTFS_VERSION_TWEAK}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Allows mounting partition tables via fuse.")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CPACK_RESOURCE_FILE_README}")
+set(CPACK_DEBIAN_PACKAGE_SECTION "admin")
+
+include(CPack)
