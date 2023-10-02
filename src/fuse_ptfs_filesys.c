@@ -18,6 +18,9 @@
  * along with fuse-ptfs. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef FUSE_USE_VERSION
+#   define FUSE_USE_VERSION 39
+#endif
 #include <fuse.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +32,21 @@
 #include "fuse_ptfs_device.h"
 #include "fuse_ptfs_log.h"
 
-void* fuse_ptfs_filesys_init(struct fuse_conn_info* apConn)
+#if defined(__cplusplus) && __cplusplus >= 201703L
+	#define MAYBE_UNUSED [[maybe_unused]]
+#else
+	#if defined(__GNUC__) || defined(__clang__)
+		#define MAYBE_UNUSED __attribute__ ((unused))
+	#else
+		#define MAYBE_UNUSED
+	#endif
+#endif
+
+void* fuse_ptfs_filesys_init(MAYBE_UNUSED struct fuse_conn_info* apConn
+#if FUSE_MAJOR_VERSION >= 3
+   , MAYBE_UNUSED struct fuse_config *cfg
+#endif
+)
 {
     LOG_ENT();
 
@@ -53,8 +70,11 @@ void fuse_ptfs_filesys_destroy(void* apUserData)
 }
 #endif
 
-int fuse_ptfs_filesys_getattr(const char* apPath, struct stat* apStat)
-{
+int fuse_ptfs_filesys_getattr(const char* apPath, struct stat* apStat
+#if FUSE_MAJOR_VERSION >= 3
+    , MAYBE_UNUSED struct fuse_file_info * fi
+#endif
+){
     LOG_ENT();
 
     FusePTFSDevice_t* tpDevice = (FusePTFSDevice_t*)fuse_get_context()->private_data;
@@ -93,7 +113,11 @@ int fuse_ptfs_filesys_getattr(const char* apPath, struct stat* apStat)
     return 0;
 }
 
-int fuse_ptfs_filesys_readdir(const char* apPath, void* apBuf, fuse_fill_dir_t aFiller, off_t aOffset, struct fuse_file_info* apFileInfo)
+int fuse_ptfs_filesys_readdir(const char* apPath, void* apBuf, fuse_fill_dir_t aFiller, MAYBE_UNUSED off_t aOffset, MAYBE_UNUSED struct fuse_file_info* apFileInfo
+#if FUSE_MAJOR_VERSION >= 3
+    , MAYBE_UNUSED enum fuse_readdir_flags flags
+#endif
+)
 {
     LOG_ENT();
 
@@ -101,15 +125,27 @@ int fuse_ptfs_filesys_readdir(const char* apPath, void* apBuf, fuse_fill_dir_t a
         return -ENOENT;
 
     FusePTFSDevice_t* tpDevice = (FusePTFSDevice_t*)fuse_get_context()->private_data;
-    aFiller(apBuf, ".", NULL, 0);
-    aFiller(apBuf, "..", NULL, 0);
+    aFiller(apBuf, ".", NULL, 0
+        #if FUSE_MAJOR_VERSION >= 3
+        , FUSE_FILL_DIR_PLUS
+        #endif
+    );
+    aFiller(apBuf, "..", NULL, 0
+        #if FUSE_MAJOR_VERSION >= 3
+        , FUSE_FILL_DIR_PLUS
+        #endif
+    );
 
     int tPartition = 0;
 
     for(tPartition = 0; tPartition < tpDevice->mNumPartitions; ++tPartition)
         // Note: It's not clear what the last two parameters are useful for (stat, off).
         // Warning: This pointer trickery is risky assuming #^/[^\0]+\0$# (regex), see fuse_ptfs_device.c and take care.
-        aFiller(apBuf, &tpDevice->mpPartitions[tPartition].mFileName[1], NULL, 0);
+        aFiller(apBuf, &tpDevice->mpPartitions[tPartition].mFileName[1], NULL, 0
+            #if FUSE_MAJOR_VERSION >= 3
+            , FUSE_FILL_DIR_PLUS
+            #endif
+        );
 
     return 0;
 }
@@ -128,7 +164,7 @@ int fuse_ptfs_filesys_open(const char* apPath, struct fuse_file_info* apFileInfo
     return 0;
 }
 
-int fuse_ptfs_filesys_read(const char* apPath, char* apBuf, size_t aSize, off_t aOffset, struct fuse_file_info* apFileInfo)
+int fuse_ptfs_filesys_read(MAYBE_UNUSED const char* apPath, char* apBuf, size_t aSize, off_t aOffset, struct fuse_file_info* apFileInfo)
 {
     LOG_ENT();
 
@@ -157,7 +193,7 @@ int fuse_ptfs_filesys_read(const char* apPath, char* apBuf, size_t aSize, off_t 
     return 0;
 }
 
-int fuse_ptfs_filesys_write(const char* apPath, const char* apBuf, size_t aSize, off_t aOffset, struct fuse_file_info* apFileInfo)
+int fuse_ptfs_filesys_write(MAYBE_UNUSED const char* apPath, const char* apBuf, size_t aSize, off_t aOffset, struct fuse_file_info* apFileInfo)
 {
     LOG_ENT();
 
@@ -187,7 +223,7 @@ int fuse_ptfs_filesys_write(const char* apPath, const char* apBuf, size_t aSize,
     return 0;
 }
 
-int fuse_ptfs_filesys_flush(const char* apPath, struct fuse_file_info* apFileInfo)
+int fuse_ptfs_filesys_flush(MAYBE_UNUSED const char* apPath, MAYBE_UNUSED struct fuse_file_info* apFileInfo)
 {
     LOG_ENT();
 
@@ -197,7 +233,11 @@ int fuse_ptfs_filesys_flush(const char* apPath, struct fuse_file_info* apFileInf
 }
 
 // Note: This is an anomaly with Linux and command interoperability.
-int fuse_ptfs_filesys_truncate(const char* apPath, off_t aNewSize)
+int fuse_ptfs_filesys_truncate(MAYBE_UNUSED const char* apPath, MAYBE_UNUSED off_t aNewSize
+#if FUSE_MAJOR_VERSION >= 3
+    , MAYBE_UNUSED struct fuse_file_info *fi
+#endif
+)
 {
     LOG_ENT();
 
