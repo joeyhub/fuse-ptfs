@@ -6,18 +6,18 @@
 
 include(CheckCXXCompilerFlag)
 
-option(HARDENING_SSE2 "Enable hardening flags requiring at least SSE2 support for target" OFF)
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.18")
+	include(CheckLinkerFlag)
+endif()
 
-set(CLANG_WORKAROUND_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/clangLinkerWorkaround.sh")
-
-function(determineSupportedHardeningFlags property)
+function(determineSupportedHardeningCompilerFlags property)
 	set(FLAGS_HARDENING "")
 	foreach(flag ${ARGN})
 		unset(var_name)
 		string(REPLACE "=" "_eq_" var_name ${flag})
 		string(REPLACE "," "_comma_" var_name ${var_name})
 		set(var_name "SUPPORTS_HARDENING_${property}_${var_name}")
-		check_cxx_compiler_flag(${flag} ${var_name})#since linker flags and other flags are in the form of compiler flags
+		check_cxx_compiler_flag(${flag} ${var_name}) #since linker flags and other flags are in the form of compiler flags. THIS DOESN'T REALLY WORK
 		if(${${var_name}})
 			list(APPEND FLAGS_HARDENING "${flag}")
 		endif()
@@ -25,24 +25,41 @@ function(determineSupportedHardeningFlags property)
 	string(REPLACE ";" " " FLAGS_HARDENING "${FLAGS_HARDENING}")
 	#message(STATUS "FLAGS_HARDENING ${FLAGS_HARDENING}")
 	set(HARDENING_${property} "${FLAGS_HARDENING}" PARENT_SCOPE)
-endfunction(determineSupportedHardeningFlags)
+endfunction(determineSupportedHardeningCompilerFlags)
 
-function(processFlagsList target property cache)
+function(determineSupportedHardeningLinkerFlags property)
+	set(FLAGS_HARDENING "")
+	foreach(flag ${ARGN})
+		unset(var_name)
+		string(REPLACE "=" "_eq_" var_name ${flag})
+		string(REPLACE "," "_comma_" var_name ${var_name})
+		set(var_name "SUPPORTS_HARDENING_${property}_${var_name}")
+		check_linker_flag(CXX ${flag} ${var_name})
+		if(${${var_name}})
+			list(APPEND FLAGS_HARDENING "${flag}")
+		endif()
+	endforeach(flag)
+	string(REPLACE ";" " " FLAGS_HARDENING "${FLAGS_HARDENING}")
+	#message(STATUS "FLAGS_HARDENING ${FLAGS_HARDENING}")
+	set(HARDENING_${property} "${FLAGS_HARDENING}" PARENT_SCOPE)
+endfunction(determineSupportedHardeningLinkerFlags)
+
+function(processCompilerFlagsList target property cache)
 	get_target_property(FLAGS_UNHARDENED ${target} ${property})
 	if(FLAGS_UNHARDENED MATCHES "FLAGS_UNHARDENED-NOTFOUND")
 		set(FLAGS_UNHARDENED "")
 	endif()
-	#message(STATUS "processFlagsList ${target} ${property} ${FLAGS_UNHARDENED}")
+	#message(STATUS "processCompilerFlagsList ${target} ${property} ${FLAGS_UNHARDENED}")
 	#message(STATUS "HARDENING_${property} ${HARDENING_${property}}")
 	
 	if(cache)
 		if(HARDENING_${property})
 		else()
-			determineSupportedHardeningFlags(${property} ${ARGN})
+			determineSupportedHardeningCompilerFlags(${property} ${ARGN})
 			set(HARDENING_${property} "${HARDENING_${property}}" CACHE STRING "Hardening flags")
 		endif()
 	else()
-		determineSupportedHardeningFlags(${property} ${ARGN})
+		determineSupportedHardeningCompilerFlags(${property} ${ARGN})
 	endif()
 	
 	set(FLAGS_HARDENED ${FLAGS_UNHARDENED})
@@ -50,7 +67,32 @@ function(processFlagsList target property cache)
 	string(REPLACE ";" " " FLAGS_HARDENED "${FLAGS_HARDENED}")
 	#message(STATUS "${target} PROPERTIES ${property} ${FLAGS_HARDENED}")
 	set_target_properties(${target} PROPERTIES ${property} "${FLAGS_HARDENED}")
-endfunction(processFlagsList)
+endfunction(processCompilerFlagsList)
+
+function(processLinkerFlagsList target property cache)
+	get_target_property(FLAGS_UNHARDENED ${target} ${property})
+	if(FLAGS_UNHARDENED MATCHES "FLAGS_UNHARDENED-NOTFOUND")
+		set(FLAGS_UNHARDENED "")
+	endif()
+	#message(STATUS "processCompilerFlagsList ${target} ${property} ${FLAGS_UNHARDENED}")
+	#message(STATUS "HARDENING_${property} ${HARDENING_${property}}")
+	
+	if(cache)
+		if(HARDENING_${property})
+		else()
+			determineSupportedHardeningLinkerFlags(${property} ${ARGN})
+			set(HARDENING_${property} "${HARDENING_${property}}" CACHE STRING "Hardening flags")
+		endif()
+	else()
+		determineSupportedHardeningLinkerFlags(${property} ${ARGN})
+	endif()
+	
+	set(FLAGS_HARDENED ${FLAGS_UNHARDENED})
+	list(APPEND FLAGS_HARDENED ${HARDENING_${property}})
+	string(REPLACE ";" " " FLAGS_HARDENED "${FLAGS_HARDENED}")
+	#message(STATUS "${target} PROPERTIES ${property} ${FLAGS_HARDENED}")
+	set_target_properties(${target} PROPERTIES ${property} "${FLAGS_HARDENED}")
+endfunction(processLinkerFlagsList)
 
 function(setupPIC target)
 	set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON) # bad, doesn't work
@@ -68,15 +110,8 @@ function(setupPIC target)
 		if(type STREQUAL "EXECUTABLE")
 			# https://mropert.github.io/2018/02/02/pic_pie_sanitizers/
 			list(APPEND HARDENING_PIC_LINKER_FLAGS
-				"-Wl,-pie"
+				"-pie;-Wl,-pie"  # Thanks to Jannik2099 for pointing out how to do it correctly
 			)
-			if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-				message(STATUS "Working around Clang bug https://bugs.llvm.org/show_bug.cgi?id=44594 ...")
-				list(APPEND HARDENING_PIC_LINKER_FLAGS
-					"--ld-path=\"${CLANG_WORKAROUND_SCRIPT}\""
-				)
-				
-			endif()
 		endif()
 	elseif(MSVC)
 		list(APPEND HARDENING_PIC_COMPILE_FLAGS
@@ -85,22 +120,22 @@ function(setupPIC target)
 	else()
 		message(ERROR "The compiler is not supported")
 	endif()
-	processFlagsList(${target} COMPILE_FLAGS OFF ${HARDENING_PIC_COMPILE_FLAGS})
-	processFlagsList(${target} LINK_FLAGS OFF ${HARDENING_PIC_LINKER_FLAGS})
+	processCompilerFlagsList(${target} COMPILE_FLAGS OFF ${HARDENING_PIC_COMPILE_FLAGS})
+	processCompilerFlagsList(${target} LINK_FLAGS OFF ${HARDENING_PIC_LINKER_FLAGS})
 endfunction(setupPIC)
 
 function(harden target)
 	setupPIC("${target}")
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		list(APPEND HARDENING_COMPILER_FLAGS
-			"-Wall" "-Wextra" "-Wconversion" "-Wformat" "-Wformat-security" "-Werror=format-security" "-fanalyzer"
+			"-Wall" "-Wextra" "-Wconversion" "-Wformat" "-Wformat-security" "-Werror=format-security"
 			"-fno-strict-aliasing" "-fno-common"
 			#"-fstack-check"
 			#"-fcf-protection=full" # conflicts to "-mindirect-branch"
+			#"-fcf-protection=branch"
 			"-fcf-runtime-abi=full"
 
 			"-ffp-exception-behavior=strict"
-			"-fstack-clash-protection"
 			"-mcet"
 			"-fsanitize=cfi"
 			"-fsanitize=cfi-cast-strict"
@@ -110,26 +145,31 @@ function(harden target)
 			"-fsanitize=cfi-vcall"
 			"-fsanitize=cfi-icall"
 			"-fsanitize=cfi-mfcall"
+			#"-fsanitize=signed-integer-overflow" # ubsan
+			#"-fsanitize=unsigned-integer-overflow" # ubsan
 			
+			"-mbranch-protection=standard"
+			"-mbranch-protection=pac-ret+leaf"
+			"-mbranch-protection=bti"
+			
+			"-fzero-call-used-regs=all"
+			"-mharden-sls=all"
+			"-mfunction-return=thunk-extern"
+			"-ftrivial-auto-var-init=pattern"
+
 			# CLang-ish flags
 			"-mretpoline"
-			"-mspeculative-load-hardening"
 			"-lvi-load-hardening"
 			"-lvi-cfi"
-			
-			#"-fsanitize=safe-stack;compiler-rt" # https://clang.llvm.org/docs/SafeStack.html
-			"-fsanitize=address" # https://clang.llvm.org/docs/AddressSanitizer.html
+			"-ehcontguard"
 			
 			# TODO implement compiler flag dependence on libs linking
-			#"-fsanitize=undefined;ubsan" # https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html , gcc also has it
-			
-			#"-fsanitize=thread" # https://clang.llvm.org/docs/ThreadSanitizer.html , 15x slowdown and 10x memory overhead
-			#"-fsanitize=memory" # https://clang.llvm.org/docs/MemorySanitizer.html 3x slowdown
-			#"-fsanitize=dataflow" # https://clang.llvm.org/docs/DataFlowSanitizer.html, taint analysis, requires explicit annotation of code
 			
 			#"-fvtable-verify=std;vtv"
+			#"-fvtable-verify=[std|preinit|none]"
 			
 			# this conflicts with gcc which now has -fcf-protection=full hardcoded
+			#"-fcf-protection=branch"
 			"-fcf-protection=none -mindirect-branch"
 			"-fcf-protection=none -mindirect-branch=thunk-extern"
 			"-fcf-protection=none -mindirect-branch=thunk-inline"
@@ -141,6 +181,17 @@ function(harden target)
 			"-mno-indirect-branch-register"
 		)
 
+		if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+			# Implemented only for 64-bit
+			list(APPEND HARDENING_COMPILER_FLAGS
+				"-mspeculative-load-hardening"
+			)
+			set(HARDENING_SSE2_DEFAULT_VALUE ON)
+		else()
+			set(HARDENING_SSE2_DEFAULT_VALUE OFF)
+		endif()
+
+		option(HARDENING_SSE2 "Enable hardening flags requiring at least SSE2 support for target" "${HARDENING_SSE2_DEFAULT_VALUE}")
 		if(HARDENING_SSE2)
 			list(APPEND HARDENING_COMPILER_FLAGS
 				"-mlfence-after-load=yes"
@@ -148,6 +199,13 @@ function(harden target)
 				"-mlfence-before-ret=not"
 			)
 		endif(HARDENING_SSE2)
+		
+		if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+			# https://clang.llvm.org/docs/ShadowCallStack.html
+			list(APPEND HARDENING_COMPILER_FLAGS
+				"-fsanitize=shadow-call-stack"
+			)
+		endif()
 
 		# some flags are bugged in GCC
 		if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
@@ -159,7 +217,7 @@ function(harden target)
 		
 		# GCC 9 has removed these flags
 		if(CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10))
-			message(STATUS "GCC 9 removes some hardening flags but doesn't fail if they are present, instead shows deprecation message. In order to not to put garbage into warnings we don't insert them. See the code of Harden.cmake for the details.")
+			message(STATUS "GCC 9 removes some hardening flags but doesn't fail if they are present, instead shows deprecation message. In order to not to put garbage into warnings we don't insert them. See the code of Hardening.cmake for the details.")
 		else()
 			list(APPEND HARDENING_COMPILER_FLAGS
 				"-mmitigate-rop" 
@@ -177,10 +235,16 @@ function(harden target)
 		
 		list(APPEND HARDENING_LINKER_FLAGS
 			"-Wl,-O1"
-			"-Wl,--sort-common"
-			"-Wl,--as-needed"
 			"-Wl,-flto"
+			"-fstack-clash-protection"
 		)
+		if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
+			list(APPEND HARDENING_LINKER_FLAGS
+				"-Wl,--sort-common"
+				"-Wl,--as-needed"
+			)
+		endif()
+
 		if(CMAKE_SYSTEM_NAME MATCHES "Windows")
 			list(APPEND HARDENING_LINKER_FLAGS
 				"-Wl,--export-all-symbols"
@@ -204,10 +268,12 @@ function(harden target)
 				"-Wl,-z,ibt"
 				"-Wl,-z,shstk"
 				"-Wl,-z,notext"  # may be required for PIC
+				"-Wl,-z-noexecstack"
+				"-Wl,-z,noexecheap"
 			)
 		endif()
 		list(APPEND HARDENING_MACRODEFS
-			"-D_FORTIFY_SOURCE=2"
+			"-D_FORTIFY_SOURCE=2"  # 3 requires recent Ubuntu, which is not available in GitHub Actions, which MinGW-w64 has __chk_fail __memcpy_chk __strcat_chk
 			"-D_GLIBCXX_ASSERTIONS"
 		)
 	elseif(MSVC)
@@ -217,8 +283,12 @@ function(harden target)
 		message(ERROR "The compiler is not supported")
 	endif()
 
-	processFlagsList(${target} COMPILE_FLAGS ON ${HARDENING_COMPILER_FLAGS})
-	processFlagsList(${target} LINK_FLAGS ON ${HARDENING_LINKER_FLAGS})
+	processCompilerFlagsList(${target} COMPILE_FLAGS ON ${HARDENING_COMPILER_FLAGS})
+	if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.18")
+		processLinkerFlagsList(${target} LINK_FLAGS ON ${HARDENING_LINKER_FLAGS})
+	else()
+		processCompilerFlagsList(${target} LINK_FLAGS ON ${HARDENING_LINKER_FLAGS})
+	endif()
 	
 	#list(JOIN HARDENING_MACRODEFS " " HARDENING_MACRODEFS) # unneeded, list is needed, not string
 	set(HARDENING_MACRODEFS "${HARDENING_MACRODEFS}" CACHE STRING "Hardening flags CMake list (not string!)")
